@@ -43,6 +43,11 @@ namespace Server
             }
         }
 
+        int byteToInt(byte[] bytes, int n)
+        {
+            return BitConverter.ToInt16(bytes, n);
+        }
+
         void HandleSocket(Socket socket)
         {
             Console.WriteLine("IN THREAD");
@@ -50,9 +55,12 @@ namespace Server
             socket.Receive(bytes);
 
             string companyName = Encoding.ASCII.GetString(bytes, 0, 10);
-            string maufacturedCode = Encoding.ASCII.GetString(bytes, 0, 20);
+            string maufacturedCode = Encoding.ASCII.GetString(bytes, 10, 20);
+
             Console.WriteLine("companyName : " + companyName);
             Console.WriteLine("manufacturerCode : " + maufacturedCode);
+            Console.WriteLine("press : " + byteToInt(bytes, 20));
+
 
             socket.Shutdown(SocketShutdown.Both);
             socket.Close();
@@ -81,5 +89,6 @@ namespace Server
         //        }
         //    }
         //}
+
     }
 }
