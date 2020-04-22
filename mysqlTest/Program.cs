@@ -2,6 +2,7 @@
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using MySql.Data.MySqlClient;
 
@@ -43,7 +44,7 @@ namespace Server
             }
         }
 
-        int byteToInt(byte[] bytes, int n)
+        int ByteToInt(byte[] bytes, int n)
         {
             return BitConverter.ToInt16(bytes, n);
         }
@@ -54,41 +55,58 @@ namespace Server
             byte[] bytes = new byte[512];
             socket.Receive(bytes);
 
-            string companyName = Encoding.ASCII.GetString(bytes, 0, 10);
-            string maufacturedCode = Encoding.ASCII.GetString(bytes, 10, 20);
-
-            Console.WriteLine("companyName : " + companyName);
-            Console.WriteLine("manufacturerCode : " + maufacturedCode);
-            Console.WriteLine("press : " + byteToInt(bytes, 20));
-
-
+            Console.WriteLine("Received : " + ByteToInt(bytes, 20) + " / " + ByteToInt(bytes, 22) + " / " + ByteToInt(bytes, 24) + " / " + ByteToInt(bytes, 26));
+            SqlInsert(bytes);
             socket.Shutdown(SocketShutdown.Both);
             socket.Close();
         }
 
-        //void SqlInsert()
-        //{
-        //    using (MySqlConnection connection = new MySqlConnection("Server="))
-        //    {
-        //        string query = "select * from press_spm";
-        //        try
-        //        {
-        //            connection.Open();
-        //            MySqlCommand command = new MySqlCommand(query, connection);
-        //            MySqlDataReader table = command.ExecuteReader();
+        void SqlInsert(byte[] bytes)
+        {
+            using MySqlConnection connection = new MySqlConnection("Server=");
+            string companyName = Regex.Replace(Encoding.ASCII.GetString(bytes, 0, 10), " ", "");
+            string manufacturedCode = Regex.Replace(Encoding.ASCII.GetString(bytes, 10, 10), " ", "");
+            string protocolKey = companyName + "_" + manufacturedCode;
 
-        //            while (table.Read())
-        //            {
-        //                Console.WriteLine("{0} {1} {2}", table["concept"], table["statement"], table["time"]);
-        //            }
-        //            table.Close();
-        //        }
-        //        catch (Exception e)
-        //        {
-        //            Console.WriteLine(e.ToString());
-        //        }
-        //    }
-        //}
+            Console.WriteLine("manufacturedCode : " + manufacturedCode + " // " + companyName);
+            //string query = "update press_spm set value = @value, time = @time where concept = @concept";
+            //string query = "insert into press_spm(user, concept, value, statement, time) values (@concept, @concept, @value, 'active', @time)";
+            connection.Open();
+            string query = String.Format("update press_spm set value = '{0}', time = '{1}' where concept = '{2}'", ByteToInt(bytes, 20), DateTime.Now.ToString("yyyy/MM/dd hh:mm:ss"), protocolKey);
+            Console.WriteLine("query : " + query);
+            MySqlCommand command = new MySqlCommand(query, connection);
+
+            Console.WriteLine(command.CommandText);
+            if (command.ExecuteNonQuery() != 1)
+            {
+                Console.WriteLine("failed.");
+            }
+
+            query = "update press_angle set value = @value, time = @time where concept = @concept";
+            command = new MySqlCommand(query, connection);
+            command.Parameters.AddWithValue("@value", ByteToInt(bytes, 22));
+            command.Parameters.AddWithValue("@time", DateTime.Now.ToString("yyyy/MM/dd hh:mm:ss"));
+            command.Parameters.AddWithValue("@concept", protocolKey);
+            command.ExecuteNonQuery();
+
+            query = "update press_main_current set value = @value, time = @time where concept = @concept";
+            command = new MySqlCommand(query, connection);
+            command.Parameters.AddWithValue("@value", ByteToInt(bytes, 24));
+            command.Parameters.AddWithValue("@time", DateTime.Now.ToString("yyyy/MM/dd hh:mm:ss"));
+            command.Parameters.AddWithValue("@concept", protocolKey);
+            command.ExecuteNonQuery();
+
+
+
+            // mysql insert query
+            //MySqlDataReader table = command.ExecuteReader();
+            //while (table.Read())
+            //{
+            //    Console.WriteLine("{0} {1} {2}", table["concept"], table["statement"], table["time"]);
+            //}
+            //table.Close();
+            connection.Close();
+        }
 
     }
 }
